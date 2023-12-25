@@ -16,4 +16,9 @@ public class ProjectAnalyzer
 
         return scenePaths.Select(scenePath => Path.GetRelativePath(_projectPath, scenePath)).ToList();
     }
+    
+    public List<string> GetSceneNames()
+    {
+        return GetScenePaths().Select(Path.GetFileNameWithoutExtension).ToList()!;
+    }
 }
