@@ -1,4 +1,7 @@
-﻿using YamlDotNet.RepresentationModel;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using YamlDotNet.RepresentationModel;
 
 namespace UnityProjectAnalysis;
 
@@ -58,22 +61,86 @@ public class ProjectAnalyzer
         foreach (ScriptItem script in scripts)
         {
             bool isUsed = false;
+
+            List<string> serializedFieldNames = GetSerializedFieldNames(script.Path).ToList();
+
             foreach (string sceneRelativePath in sceneRelativePaths)
             {
-                string scenePath = Path.Combine(_projectPath, sceneRelativePath);
-                string sceneYamlText = File.ReadAllText(scenePath);
-                // if its GUID is in the scene file, it's used in some way
-                if (sceneYamlText.Contains(script.Guid.ToString("N")))
+                if (DoesSceneContainField(sceneRelativePath, script, serializedFieldNames))
                 {
                     isUsed = true;
+                    break;
                 }
             }
-            
+
             if (!isUsed)
             {
                 yield return script;
             }
         }
+    }
+
+    private bool DoesSceneContainField(
+        string sceneRelativePath,
+        ScriptItem script,
+        IReadOnlyCollection<string> serializedFieldNames)
+    {
+        string scenePath = Path.Combine(_projectPath, sceneRelativePath);
+        foreach (string line in File.ReadAllLines(scenePath))
+        {
+            if (!line.Contains(script.Guid.ToString("N"))) continue;
+
+            if (serializedFieldNames.Any(serializedField => line.Contains(serializedField))
+                || line.Contains("m_Script: {fileID: 11500000, guid: "))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IEnumerable<string> GetSerializedFieldNames(string scriptRelativePath)
+    {
+        string scriptPath = Path.Combine(_projectPath, scriptRelativePath);
+        string scriptText = File.ReadAllText(scriptPath);
+        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(scriptText);
+        var root = (CompilationUnitSyntax)syntaxTree.GetRoot();
+        var classDeclarations = root.DescendantNodes().OfType<ClassDeclarationSyntax>();
+        var fields = classDeclarations.SelectMany(classDeclaration =>
+            classDeclaration.DescendantNodes().OfType<FieldDeclarationSyntax>());
+        foreach (var field in fields)
+        {
+            if (!IsFieldSerialized(field)) continue;
+
+            var declarations = field.Declaration.Variables;
+
+            foreach (var declaration in declarations)
+            {
+                yield return declaration.Identifier.ValueText;
+            }
+        }
+    }
+
+    private static bool IsFieldSerialized(FieldDeclarationSyntax field)
+    {
+        if (field.Modifiers.Any(modifier => modifier.ToString() == "public"))
+        {
+            return true;
+        }
+
+        foreach (AttributeListSyntax attributeList in field.AttributeLists)
+        {
+            foreach (AttributeSyntax attribute in attributeList.Attributes)
+            {
+                if (attribute.Name.ToString() == "SerializeField")
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public List<GameObjectItem> GetGameObjectsFromScene(string sceneName)
