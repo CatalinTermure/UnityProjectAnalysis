@@ -26,7 +26,17 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Content Include="tests\**">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
       <None Remove="tests\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\UnityProjectAnalysis\UnityProjectAnalysis.csproj" />
     </ItemGroup>
 
 </Project>
