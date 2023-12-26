@@ -77,7 +77,9 @@ public class ProjectAnalyzer
                     }
                 );
 
-            gameObjects.Add(new GameObjectItem(fileId, components.ToArray()));
+            string name = ((YamlScalarNode)gameObjectMapping.Children[new YamlScalarNode("m_Name")]).Value!;
+
+            gameObjects.Add(new GameObjectItem(fileId, name, components.ToArray()));
         }
 
         return gameObjects;
