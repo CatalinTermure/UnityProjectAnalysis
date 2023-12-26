@@ -23,4 +23,20 @@ public class SceneParsing
         Assert.That(scenes, Contains.Item("SampleScene"));
         Assert.That(scenes, Contains.Item("SecondScene"));
     }
+    
+    [Test]
+    public void SceneGameObjectsFound()
+    {
+        var projectAnalyzer = new ProjectAnalyzer("tests/TestCase01");
+        List<GameObjectItem> gameObjects = projectAnalyzer.GetGameObjectsFromScene("SampleScene");
+        Assert.That(gameObjects, Has.Count.EqualTo(5));
+        Assert.That(gameObjects, Has.One.Matches<GameObjectItem>(gameObject => gameObject.FileId == 136406834));
+        Assert.That(gameObjects, Has.One.Matches<GameObjectItem>(gameObject => gameObject.FileId == 705507993));
+        Assert.That(gameObjects, Has.One.Matches<GameObjectItem>(gameObject => gameObject.FileId == 963194225));
+        Assert.That(gameObjects, Has.One.Matches<GameObjectItem>(gameObject => gameObject.FileId == 2115756237));
+        Assert.That(gameObjects, Has.One.Matches<GameObjectItem>(gameObject => gameObject.FileId == 2118425382));
+        
+        gameObjects = projectAnalyzer.GetGameObjectsFromScene("SecondScene");
+        Assert.That(gameObjects, Has.Count.EqualTo(6));
+    }
 }
