@@ -11,7 +11,7 @@ public class ProjectAnalyzer
         _projectPath = projectPath;
     }
 
-    public List<string> GetScenePaths()
+    public List<string> GetSceneRelativePaths()
     {
         string scenesDirectory = Path.Combine(_projectPath, "Assets", "Scenes");
         string[] scenePaths = Directory.GetFiles(scenesDirectory, "*.unity", SearchOption.AllDirectories);
@@ -21,7 +21,59 @@ public class ProjectAnalyzer
 
     public List<string> GetSceneNames()
     {
-        return GetScenePaths().Select(Path.GetFileNameWithoutExtension).ToList()!;
+        return GetSceneRelativePaths().Select(Path.GetFileNameWithoutExtension).ToList()!;
+    }
+
+    public List<ScriptItem> GetScripts()
+    {
+        string scriptsDirectory = Path.Combine(_projectPath, "Assets", "Scripts");
+        string[] scriptPaths = Directory.GetFiles(scriptsDirectory, "*.cs", SearchOption.AllDirectories);
+
+        List<ScriptItem> scriptItems = new();
+        foreach (string scriptPath in scriptPaths)
+        {
+            string scriptMetaPath = Path.ChangeExtension(scriptPath, ".cs.meta");
+            if (!File.Exists(scriptMetaPath))
+            {
+                throw new FileNotFoundException($"Script meta file not found: {scriptMetaPath}");
+            }
+
+            var scriptMetaYaml = new YamlStream();
+            scriptMetaYaml.Load(new StreamReader(scriptMetaPath));
+            var rootNode = (YamlMappingNode)scriptMetaYaml.Documents[0].RootNode;
+            var guidNode = (YamlScalarNode)rootNode.Children[new YamlScalarNode("guid")];
+            Guid guid = Guid.Parse(guidNode.Value!);
+
+            scriptItems.Add(new ScriptItem(Path.GetRelativePath(_projectPath, scriptPath), guid));
+        }
+
+        return scriptItems;
+    }
+
+    public IEnumerable<ScriptItem> GetUnusedScripts()
+    {
+        List<ScriptItem> scripts = GetScripts();
+        List<string> sceneRelativePaths = GetSceneRelativePaths();
+
+        foreach (ScriptItem script in scripts)
+        {
+            bool isUsed = false;
+            foreach (string sceneRelativePath in sceneRelativePaths)
+            {
+                string scenePath = Path.Combine(_projectPath, sceneRelativePath);
+                string sceneYamlText = File.ReadAllText(scenePath);
+                // if its GUID is in the scene file, it's used in some way
+                if (sceneYamlText.Contains(script.Guid.ToString("N")))
+                {
+                    isUsed = true;
+                }
+            }
+            
+            if (!isUsed)
+            {
+                yield return script;
+            }
+        }
     }
 
     public List<GameObjectItem> GetGameObjectsFromScene(string sceneName)
